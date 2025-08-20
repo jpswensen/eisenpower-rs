@@ -1,0 +1,313 @@
+/* SVG Undo icon for Undo button */
+.svg-undo {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0id2hpdGUiIHZpZXdCb3g9IjAgMCAyNCAyNCI+CiAgPHBhdGggZD0iTTEyIDVWMUw3IDZsNSA1VjdjMi43NTcgMCA1IDIuMjQzIDUgNXMtMi4yNDMgNS01IDUtNS0yLjI0My01LTVINWMwIDMuODY2IDMuMTM0IDcgNyA3czctMy4xMzQgNy03LTMuMTM0LTctNy03eiIvPgo8L3N2Zz4=");
+  background-size: 1.5em 1.5em;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+/* SVG X icon for Delete button */
+.delete-btn .svg-x {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0id2hpdGUiIHZpZXdCb3g9IjAgMCAyNCAyNCI+CiAgPHBhdGggZD0iTTE4LjM2NCA1LjYzNmwtMS40MTQtMS40MTRMMTIgOS4xNzIgNy4wNSA0LjIyMiA1LjYzNiA1LjYzNiAxMC41ODYgMTAuNTg2IDUuNjM2IDE1LjUzNkw3LjA1IDE2Ljk2IDExLjk5OSAxMi40MTQgMTYuOTUgMTcuMzY0bDEuNDE0LTEuNDE0TDEzLjQxNCAxMC41ODZ6Ii8+Cjwvc3ZnPg==");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
+}
+/* SVG checkmark icon for Done button */
+.done-btn .svg-check {
+  display: inline-block;
+  width: 1.3em;
+  height: 1.3em;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0id2hpdGUiIHZpZXdCb3g9IjAgMCAyNCAyNCI+CiAgPHBhdGggZD0iTTIwLjI4NSA2LjcwOWwtMTEuMjg1IDExLjI4NS01LjI4NS01LjI4NSAxLjQxNS0xLjQxNSAzLjg3IDMuODcgOS44Ny05Ljg3eiIvPgo8L3N2Zz4=");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
+}
+:root{
+  --ui:#A74441;
+  --uni:#A78841;
+  --nui:#344171;
+  --nun:#338339;
+  --today: rgba(64,64,64,.9);
+  --cell-bg: rgba(0,0,0,.1);
+  --text:#fff;
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100vh;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: #111;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+/* Matrix scroll container for wide layouts */
+.matrix-scroll {
+  overflow-x: auto;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  padding: 10px 16px;
+  border-bottom: 1px solid #333;
+  background: #1a1a1a;
+  flex: 0 0 auto;
+  z-index: 10;
+  min-width: 900px;
+  width: 100%;
+}
+.grid {
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  min-width: 900px;
+  min-height: 0;
+  height: 100%;
+}
+.column {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.column-title{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 8px; font-weight:600;
+  background:var(--cell-bg); border-radius:4px; margin-bottom:8px;
+}
+.column.ui{ background: var(--ui);}
+.column.uni{ background: var(--uni);}
+.column.nui{ background: var(--nui);}
+.column.nun{ background: var(--nun);}
+.column.today{ background: var(--today); grid-row: 1 / span 2;}
+
+ul.tasklist{ list-style:none; margin:0; padding:0; flex:1; overflow:auto;}
+li.task{
+  background: var(--cell-bg);
+  margin:6px 0; padding:10px 12px; border-radius:6px;
+  display:flex; align-items:flex-start; gap:10px;
+}
+li.task .text{ flex:1; white-space:pre-wrap; }
+li.task .controls{ display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:nowrap; }
+
+.add-form{ margin-top:8px; display:flex; gap:8px; }
+.add-form input[type=text]{ flex:1; padding:8px 10px; border:0; border-radius:6px; }
+.add-form button{ padding:8px 12px; border:0; border-radius:6px; cursor:pointer; }
+.badge{ font-size:.75rem; opacity:.9; padding:2px 6px; border-radius:999px; background:#0004; }
+.small{ font-size:.85rem; opacity:.9; }
+.muted{ opacity:.7; }
+.color-chip{ width:10px; height:10px; border-radius:2px; margin-top:6px; }
+.color-UI{ background: var(--ui) }
+.color-UNI{ background: var(--uni) }
+.color-NUI{ background: var(--nui) }
+.color-NUN{ background: var(--nun) }
+
+ul.tasklist::-webkit-scrollbar { width: 10px; }
+ul.tasklist::-webkit-scrollbar-thumb { background: #0006; border-radius: 6px; }
+
+.completed-panel {
+  position: fixed;
+  top: 60px;
+  right: 0;
+  width: 60vw;
+  max-width: 900px;
+  min-width: 320px;
+  height: 80vh;
+  background: #222;
+  color: #fff;
+  border-left: 2px solid #444;
+  box-shadow: -2px 0 12px #000a;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  transition: width 0.2s;
+}
+
+@media (max-width: 700px) {
+  .completed-panel {
+    width: 100vw;
+    left: 0;
+    right: 0;
+    border-left: none;
+    border-top: 2px solid #444;
+    top: 0;
+    height: 100vh;
+    max-width: 100vw;
+    min-width: 0;
+    border-radius: 0;
+  }
+  .completed-panel-content {
+    padding: 12px 4px 4px 4px;
+  }
+}
+.completed-panel-content {
+  padding: 20px 20px 10px 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+.completed-tasklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.completed-tasklist-header {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 0.7fr 0.7fr;
+  font-weight: bold;
+  padding: 8px 12px;
+  background: #292929;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 4px;
+  color: #fff;
+}
+.completed-task {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr auto;
+  align-items: center;
+  background: #333;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  gap: 8px;
+}
+/* Removed old button alignment rules */
+/* Flex container for right-aligned, non-wrapping action buttons in completed tasks */
+.button-group {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-width: 90px;
+}
+}
+.completed-title {
+  color: #aaa;
+  text-decoration: line-through;
+  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.completed-tasklist-header, .completed-task {
+  /* Responsive grid for mobile */
+}
+@media (max-width: 700px) {
+  .completed-tasklist-header, .completed-task {
+    grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr;
+    font-size: 1em;
+  }
+  .completed-title, .completed-time {
+    font-size: 1em;
+    min-width: 0;
+    max-width: 100vw;
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+.completed-time {
+  color: #ccc;
+  font-size: 0.97em;
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+  gap: 0;
+}
+.completed-date {
+  display: block;
+}
+.completed-time-only {
+  display: block;
+}
+@media (max-width: 700px) {
+  .completed-time {
+    font-size: 1em;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    white-space: normal;
+  }
+  .completed-date, .completed-time-only {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+}
+.completed-task button, .controls button {
+  margin-left: 8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #444;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.6em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background 0.15s;
+}
+.completed-task button:hover, .controls button:hover {
+  background: #666;
+}
+.controls button.delete-btn, .completed-task button.delete-btn {
+  background: #a74441;
+  color: #fff;
+}
+.controls button.delete-btn:hover, .completed-task button.delete-btn:hover {
+  background: #c62828;
+}
+
+/* Place .done-btn and .undo-btn after all other button rules for correct specificity */
+.done-btn {
+  background: #2e7d32 !important;
+  color: #fff !important;
+  border-radius: 8px;
+  font-size: 2.2em;
+  font-family: "Arial Unicode MS", "Segoe UI Symbol", sans-serif;
+/* Removed .checkbox-icon, reverting to checkmark */
+  box-shadow: 0 1px 2px #0004;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.done-btn:hover {
+  background: #388e3c !important;
+  color: #fff !important;
+}
+.undo-btn {
+  background: #1976d2 !important;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 1.6em;
+  box-shadow: 0 1px 2px #0004;
+}
+.undo-btn:hover {
+  background: #1565c0 !important;
+}
+.controls button.delete-btn, .completed-task button.delete-btn {
+  background: #a74441;
+  color: #fff;
+}
+.controls button.delete-btn:hover, .completed-task button.delete-btn:hover {
+  background: #c62828;
+}

@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  eisenhower:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - EISENHOWER_USERNAME=${EISENHOWER_USERNAME:-admin}
+      - EISENHOWER_PASSWORD=${EISENHOWER_PASSWORD:-password}
+      - PORT=${PORT:-8080}
+    volumes:
+      - eisenhower_data:/app
+    restart: unless-stopped
+volumes:
+  eisenhower_data:
+    driver: local
