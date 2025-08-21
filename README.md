@@ -16,6 +16,13 @@ Here are some of the features
 - Data lives in a local file `tasks.db` (created automatically for the docker image, and the git repository contains and empty tasks.db with all the right tables).
 - Requires rudimentary HTTP auth to log in (default username is 'admin' and default password is 'password'). These can be changed via the docker-compose.yml file or environment variables.
 
+## Screenshots
+![The main window](images/main_window.png)
+
+![The completed tasks modal window](images/completed_tasks.png)
+
+
+## How to Run
 To run from the command line:
 ```
 cargo run
