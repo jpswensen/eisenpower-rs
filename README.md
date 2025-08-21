@@ -16,6 +16,9 @@ Here are some of the features
 - Data lives in a local file `tasks.db` (created automatically for the docker image, and the git repository contains and empty tasks.db with all the right tables).
 - Requires rudimentary HTTP auth to log in (default username is 'admin' and default password is 'password'). These can be changed via the docker-compose.yml file or environment variables.
 
+
+*Note*: This was 100% done via vibe coding, using my Swift implementation from 8 years ago and a screenshot of that interface as the input. I consider myself a pretty good programmer, but this was an experiment about whether I could make a fully functioning app without actually doing any coding. During this whole process, I resisted the urge to jump in and make code corrections along the way. Instead I was using GPT4.1 and only giving it prompts about what features I wanted to add, how I was expecting it to behave, and how it actually behaved. This was in VSCode with Copilot, so it was often interpreting the compiler errors and acting accordingly. I have used AI a lot in my day-to-day coding, but never done the full 'vibe coding' thing. I usually just have it implement a function here or there where I am giving it a function signature or a data structure or a directive, then edit code, then have it optimize or improve, etc. This was wholly code written by it without any "coding intervention" by me.
+
 ## Screenshots
 ![The main window](images/main_window.png)
 
