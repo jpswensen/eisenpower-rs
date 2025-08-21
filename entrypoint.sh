@@ -9,4 +9,4 @@ if [ ! -f /app/tasks.db ]; then
   done
 fi
 
-exec /app/eisenhower_matrix
+exec /app/eisenpower-rs

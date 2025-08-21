@@ -10,7 +10,7 @@ RUN mkdir -p /var/cache/apt/archives/partial \
 	&& apt-get update \
 	&& apt-get install -y sqlite3 \
 	&& rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/eisenhower_matrix /app/
+COPY --from=builder /app/target/release/eisenpower-rs /app/
 COPY static ./static
 COPY migrations ./migrations
 COPY entrypoint.sh /entrypoint.sh
