@@ -6,18 +6,13 @@ RUN RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 FROM debian:trixie-slim
 WORKDIR /app
-RUN mkdir -p /var/cache/apt/archives/partial \
-	&& apt-get update \
-	&& apt-get install -y sqlite3 \
-	&& rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/eisenpower-rs /app/
 COPY static ./static
-COPY migrations ./migrations
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENV EISENHOWER_USERNAME=admin
-ENV EISENHOWER_PASSWORD=password
+ENV EISENPOWER_USERS=admin:password
+ENV EISENPOWER_DATA_DIR=/app/data
 ENV PORT=8080
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]

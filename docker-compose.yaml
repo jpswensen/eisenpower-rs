@@ -5,11 +5,12 @@ services:
     ports:
       - "${PORT:-8080}:8080"
     environment:
-      - EISENHOWER_USERNAME=${EISENHOWER_USERNAME:-admin}
-      - EISENHOWER_PASSWORD=${EISENHOWER_PASSWORD:-password}
+      - EISENPOWER_USERS=${EISENPOWER_USERS:-admin:password}
+      - EISENPOWER_DATA_DIR=/app/data
+      - EISENPOWER_SESSION_SECRET=${EISENPOWER_SESSION_SECRET:-change-me-for-shared-deployments}
       - PORT=${PORT:-8080}
     volumes:
-      - eisenhower_data:/app
+      - eisenhower_data:/app/data
     restart: unless-stopped
 volumes:
   eisenhower_data:
