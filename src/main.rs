@@ -274,7 +274,7 @@ async fn init_schema(pool: &SqlitePool) -> anyhow::Result<()> {
             completed INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL DEFAULT 0,
             parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
-            collapsed INTEGER NOT NULL DEFAULT 0,
+            collapsed INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
@@ -292,7 +292,7 @@ async fn init_schema(pool: &SqlitePool) -> anyhow::Result<()> {
     add_column_if_missing(
         pool,
         "collapsed",
-        "ALTER TABLE tasks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 1",
     )
     .await?;
 
@@ -512,38 +512,38 @@ fn render_index(username: &str, groups: BTreeMap<&'static str, Vec<Task>>) -> St
             <span class="small muted">Signed in as {}</span>
         </div>
         <div class="header-actions">
-            <button id="refresh-btn" type="button">Refresh</button>
-            <button id="show-completed-btn" type="button">Completed Tasks</button>
+            <button id="refresh-btn" type="button" tabindex="-1">Refresh</button>
+            <button id="show-completed-btn" type="button" tabindex="-1">Completed Tasks</button>
             <form method="post" action="/logout">
-                <button type="submit">Sign out</button>
+                <button type="submit" tabindex="-1">Sign out</button>
             </form>
         </div>
     </header>
     <main class="grid">
         <section class="column ui">
-            <div class="column-title"><div>Urgent & Important</div><span class="badge">Add / Drag</span></div>
+            <div class="column-title">Urgent & Important</div>
             {}
         </section>
         <section class="column uni">
-            <div class="column-title"><div>Urgent & Not Important</div><span class="badge">Add / Drag</span></div>
+            <div class="column-title">Urgent & Not Important</div>
             {}
         </section>
         <section class="column today">
-            <div class="column-title"><div>Today's Tasks</div><span class="badge">Drag from any column</span></div>
+            <div class="column-title">Today's Tasks</div>
             {}
         </section>
         <section class="column nui">
-            <div class="column-title"><div>Not Urgent & Important</div><span class="badge">Add / Drag</span></div>
+            <div class="column-title">Not Urgent & Important</div>
             {}
         </section>
         <section class="column nun">
-            <div class="column-title"><div>Not Urgent & Not Important</div><span class="badge">Add / Drag</span></div>
+            <div class="column-title">Not Urgent & Not Important</div>
             {}
         </section>
     </main>
     <aside id="completed-panel" class="completed-panel" hidden>
         <div class="completed-panel-content">
-            <button id="close-completed-btn" type="button" class="panel-close">Close</button>
+            <button id="close-completed-btn" type="button" class="panel-close" tabindex="-1">Close</button>
             <h2>Completed Tasks</h2>
             <div id="completed-tasks-list" hx-get="/completed" hx-trigger="revealed" hx-swap="innerHTML"></div>
         </div>
@@ -570,16 +570,87 @@ async function postJson(url, body) {{
 function replaceDragged(item, html) {{
     const temp = document.createElement('template');
     temp.innerHTML = html.trim();
-    const replacement = temp.content.firstElementChild;
-    if (!replacement) {{
+    const replacements = Array.from(temp.content.children);
+    if (replacements.length === 0) {{
         item.remove();
         return;
     }}
-    item.replaceWith(replacement);
+    item.replaceWith(...replacements);
     if (window.htmx) {{
-        window.htmx.process(replacement);
+        replacements.forEach((replacement) => window.htmx.process(replacement));
     }}
     initSortables();
+}}
+
+let activeDragItem = null;
+let nestingCandidate = null;
+const NESTING_EDGE_RATIO = 0.10;
+
+function setNestingCandidate(task) {{
+    if (nestingCandidate === task) return;
+    clearNestingCandidate();
+    nestingCandidate = task;
+    if (nestingCandidate) nestingCandidate.classList.add('nesting-candidate');
+}}
+
+function clearNestingCandidate() {{
+    if (nestingCandidate) nestingCandidate.classList.remove('nesting-candidate');
+    nestingCandidate = null;
+}}
+
+function dragPoint(event) {{
+    if (!event) return null;
+    if (event.touches && event.touches.length > 0) return event.touches[0];
+    if (event.changedTouches && event.changedTouches.length > 0) return event.changedTouches[0];
+    if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) return event;
+    return null;
+}}
+
+function updateNestingCandidate(event) {{
+    if (!activeDragItem) return;
+    const point = dragPoint(event);
+    if (!point) return;
+    let candidate = null;
+    document.querySelectorAll('.top-task').forEach((task) => {{
+        if (candidate || task === activeDragItem || activeDragItem.contains(task)) return;
+        const row = task.querySelector(':scope > .task-row');
+        if (!row) return;
+        const rect = row.getBoundingClientRect();
+        if (point.clientX < rect.left || point.clientX > rect.right || point.clientY < rect.top || point.clientY > rect.bottom) return;
+        const yRatio = (point.clientY - rect.top) / rect.height;
+        if (yRatio > NESTING_EDGE_RATIO && yRatio < 1 - NESTING_EDGE_RATIO) {{
+            candidate = task;
+        }}
+    }});
+    setNestingCandidate(candidate);
+    return candidate;
+}}
+
+function appendDraggedToParent(item, parentTask, html) {{
+    const targetList = parentTask.querySelector(':scope > .subtask-region > .subtask-list');
+    if (!targetList) {{
+        replaceDragged(item, html);
+        return null;
+    }}
+    const temp = document.createElement('template');
+    temp.innerHTML = html.trim();
+    const replacements = Array.from(temp.content.children);
+    item.remove();
+    targetList.append(...replacements);
+    if (window.htmx) {{
+        replacements.forEach((replacement) => window.htmx.process(replacement));
+    }}
+    expandDropParent(targetList);
+    initSortables();
+    return targetList;
+}}
+
+function expandDropParent(list) {{
+    const parentTask = list.closest('.top-task');
+    if (!parentTask) return;
+    parentTask.classList.remove('is-collapsed');
+    const collapseButton = parentTask.querySelector(':scope > .task-row .collapse-btn');
+    if (collapseButton) collapseButton.innerHTML = '&#9662;';
 }}
 
 async function reorderList(list) {{
@@ -605,11 +676,37 @@ function initSortables() {{
         new Sortable(el, {{
             animation: 150,
             group: {{ name: 'matrix', pull: true, put: true }},
-            draggable: '.top-task',
+            draggable: '.top-task, .subtask',
             delay: 250,
             delayOnTouchOnly: true,
+            emptyInsertThreshold: 48,
+            swapThreshold: 0.35,
+            onStart: function(evt) {{
+                activeDragItem = evt.item;
+                document.body.classList.add('dragging-task');
+            }},
+            onMove: function(evt) {{
+                return updateNestingCandidate(evt.originalEvent) ? false : true;
+            }},
             onEnd: async function(evt) {{
+                updateNestingCandidate(evt.originalEvent);
+                const candidate = nestingCandidate;
+                clearNestingCandidate();
+                document.body.classList.remove('dragging-task');
+                activeDragItem = null;
                 const id = Number(evt.item.dataset.id);
+                if (candidate) {{
+                    const response = await postJson('/move', {{
+                        id: id,
+                        parentId: Number(candidate.dataset.id),
+                        index: candidate.querySelectorAll(':scope > .subtask-region > .subtask-list > .subtask').length
+                    }});
+                    if (!response) return;
+                    const targetList = appendDraggedToParent(evt.item, candidate, await response.text());
+                    if (targetList) await reorderList(targetList);
+                    if (evt.from !== targetList) await reorderList(evt.from);
+                    return;
+                }}
                 if (evt.to.classList.contains('subtask-list')) {{
                     const response = await postJson('/move', {{
                         id: id,
@@ -617,6 +714,7 @@ function initSortables() {{
                         index: evt.newDraggableIndex ?? evt.newIndex
                     }});
                     if (!response) return;
+                    expandDropParent(evt.to);
                     replaceDragged(evt.item, await response.text());
                     await reorderList(evt.to);
                     if (evt.from !== evt.to) await reorderList(evt.from);
@@ -642,17 +740,58 @@ function initSortables() {{
         el.dataset.sortableReady = '1';
         new Sortable(el, {{
             animation: 150,
-            group: {{ name: 'matrix', pull: false, put: true }},
+            group: {{ name: 'matrix', pull: true, put: true }},
             draggable: '.subtask',
             delay: 250,
             delayOnTouchOnly: true,
+            emptyInsertThreshold: 48,
+            swapThreshold: 0.35,
+            onStart: function(evt) {{
+                activeDragItem = evt.item;
+                document.body.classList.add('dragging-task');
+            }},
+            onMove: function(evt) {{
+                return updateNestingCandidate(evt.originalEvent) ? false : true;
+            }},
             onEnd: async function(evt) {{
+                updateNestingCandidate(evt.originalEvent);
+                const candidate = nestingCandidate;
+                clearNestingCandidate();
+                document.body.classList.remove('dragging-task');
+                activeDragItem = null;
+                if (candidate) {{
+                    const response = await postJson('/move', {{
+                        id: Number(evt.item.dataset.id),
+                        parentId: Number(candidate.dataset.id),
+                        index: candidate.querySelectorAll(':scope > .subtask-region > .subtask-list > .subtask').length
+                    }});
+                    if (!response) return;
+                    const targetList = appendDraggedToParent(evt.item, candidate, await response.text());
+                    if (targetList) await reorderList(targetList);
+                    if (evt.from !== targetList) await reorderList(evt.from);
+                    return;
+                }}
+                if (evt.to.classList.contains('tasklist')) {{
+                    const response = await postJson('/move', {{
+                        id: Number(evt.item.dataset.id),
+                        bucket: evt.to.dataset.bucket,
+                        parentId: null,
+                        index: evt.newDraggableIndex ?? evt.newIndex
+                    }});
+                    if (!response) return;
+                    replaceDragged(evt.item, await response.text());
+                    await reorderList(evt.to);
+                    if (evt.from !== evt.to) await reorderList(evt.from);
+                    return;
+                }}
+
                 const response = await postJson('/move', {{
                     id: Number(evt.item.dataset.id),
                     parentId: Number(evt.to.dataset.parentId),
                     index: evt.newDraggableIndex ?? evt.newIndex
                 }});
                 if (!response) return;
+                expandDropParent(evt.to);
                 replaceDragged(evt.item, await response.text());
                 await reorderList(evt.to);
             }}
@@ -662,6 +801,9 @@ function initSortables() {{
 
 document.addEventListener('DOMContentLoaded', initSortables);
 document.body.addEventListener('htmx:afterSwap', initSortables);
+document.addEventListener('pointermove', updateNestingCandidate);
+document.addEventListener('mousemove', updateNestingCandidate);
+document.addEventListener('touchmove', updateNestingCandidate, {{ passive: true }});
 
 let lastScrollX = 0;
 document.body.addEventListener('htmx:beforeSwap', function() {{
@@ -699,28 +841,36 @@ document.addEventListener('DOMContentLoaded', function() {{
 </body>
 </html>"#,
         html_escape(username),
-        render_column("UrgentImportant", "list-UI", &ui),
-        render_column("UrgentNotImportant", "list-UNI", &uni),
-        render_column("Today", "list-TODAY", &today),
-        render_column("NotUrgentImportant", "list-NUI", &nui),
-        render_column("NotUrgentNotImportant", "list-NUN", &nun),
+        render_column("UrgentImportant", "list-UI", &ui, 3, 4),
+        render_column("UrgentNotImportant", "list-UNI", &uni, 5, 6),
+        render_column("Today", "list-TODAY", &today, 1, 2),
+        render_column("NotUrgentImportant", "list-NUI", &nui, 7, 8),
+        render_column("NotUrgentNotImportant", "list-NUN", &nun, 9, 10),
     )
 }
 
-fn render_column(bucket: &str, list_id: &str, tasks: &[Task]) -> String {
-    let mut html = format!(r#"<ul class="tasklist" id="{list_id}" data-bucket="{bucket}">"#);
+fn render_column(
+    bucket: &str,
+    list_id: &str,
+    tasks: &[Task],
+    input_tabindex: i32,
+    button_tabindex: i32,
+) -> String {
+    let mut html = format!(
+        r##"
+<form class="add-form" hx-post="/tasks" hx-target="#{list_id}" hx-swap="beforeend" hx-on::after-request="this.reset()">
+    <input type="hidden" name="bucket" value="{bucket}">
+    <input type="text" name="title" placeholder="New task..." autocomplete="off" tabindex="{input_tabindex}" required>
+    <button type="submit" tabindex="{button_tabindex}">Add</button>
+</form>"##
+    );
+    html.push_str(&format!(
+        r#"<ul class="tasklist" id="{list_id}" data-bucket="{bucket}">"#
+    ));
     for task in tasks {
         html.push_str(&render_task(task));
     }
     html.push_str("</ul>");
-    html.push_str(&format!(
-        r##"
-<form class="add-form" hx-post="/tasks" hx-target="#{list_id}" hx-swap="beforeend" hx-on::after-request="this.reset()">
-    <input type="hidden" name="bucket" value="{bucket}">
-    <input type="text" name="title" placeholder="Add new task here..." autocomplete="off" required>
-    <button type="submit">Add</button>
-</form>"##
-    ));
     html
 }
 
@@ -740,15 +890,15 @@ fn render_task(task: &Task) -> String {
         r##"<li class="task top-task{collapsed_class}" data-id="{id}">
     <div class="task-row">
         <div class="color-chip {chip}"></div>
-        <button class="collapse-btn" type="button" hx-post="/tasks/{id}/collapse" hx-target="closest li.task" hx-swap="outerHTML" title="Expand or collapse subtasks">{collapse_symbol}</button>
-        <div class="text" contenteditable="true" onblur="fetch('/tasks/{id}', {{method:'PATCH', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{title:this.innerText}})}})">{title}</div>
+        <button class="collapse-btn" type="button" tabindex="-1" hx-post="/tasks/{id}/collapse" hx-target="closest li.task" hx-swap="outerHTML" title="Expand or collapse subtasks">{collapse_symbol}</button>
+        <div class="text" contenteditable="true" tabindex="-1" onblur="fetch('/tasks/{id}', {{method:'PATCH', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{title:this.innerText}})}})">{title}</div>
         <div class="controls">{completion_button}{delete_button}</div>
     </div>
     <div class="subtask-region">
         <ul class="subtask-list" id="subtasks-{id}" data-parent-id="{id}">{children}</ul>
         <form class="add-subtask-form" hx-post="/tasks/{id}/subtasks" hx-target="#subtasks-{id}" hx-swap="beforeend" hx-on::after-request="this.reset()">
-            <input type="text" name="title" placeholder="Add a subtask..." autocomplete="off" required>
-            <button type="submit">Add subtask</button>
+            <input type="text" name="title" placeholder="Add a subtask..." autocomplete="off" tabindex="-1" required>
+            <button type="submit" tabindex="-1">Add subtask</button>
         </form>
     </div>
 </li>"##,
@@ -768,8 +918,8 @@ fn render_subtask(task: &Task) -> String {
 
     format!(
         r#"<li class="subtask{completed_class}" data-id="{id}">
-    <span class="drag-handle" title="Drag to reorder">::</span>
-    <div class="subtask-text" contenteditable="true" onblur="fetch('/tasks/{id}', {{method:'PATCH', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{title:this.innerText}})}})">{title}</div>
+    <span class="drag-handle" title="Drag to reorder or promote" aria-hidden="true"></span>
+    <div class="subtask-text" contenteditable="true" tabindex="-1" onblur="fetch('/tasks/{id}', {{method:'PATCH', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{title:this.innerText}})}})">{title}</div>
     <div class="controls">{completion_button}{delete_button}</div>
 </li>"#,
         id = task.id,
@@ -788,14 +938,14 @@ fn completion_button(task: &Task, target: &str, reload_after_swap: bool) -> Stri
         ""
     };
     format!(
-        "<button class='{class}' type='button' hx-post='/tasks/{}/toggle' hx-target='{target}' hx-swap='outerHTML'{after_swap} title='{title}'>{icon}</button>",
+        "<button class='{class}' type='button' tabindex='-1' hx-post='/tasks/{}/toggle' hx-target='{target}' hx-swap='outerHTML'{after_swap} title='{title}'>{icon}</button>",
         task.id
     )
 }
 
 fn delete_button(id: i64, target: &str) -> String {
     format!(
-        "<button class='delete-btn' type='button' hx-post='/tasks/{id}/delete' hx-target='{target}' hx-swap='outerHTML' title='Delete'>&times;</button>"
+        "<button class='delete-btn' type='button' tabindex='-1' hx-post='/tasks/{id}/delete' hx-target='{target}' hx-swap='outerHTML' title='Delete'>&times;</button>"
     )
 }
 
@@ -971,8 +1121,8 @@ async fn add_task(
 
     let id = match sqlx::query(
         r#"
-        INSERT INTO tasks(title, task_type, bucket, position)
-        VALUES (?1, ?2, ?3, ?4)
+        INSERT INTO tasks(title, task_type, bucket, position, collapsed)
+        VALUES (?1, ?2, ?3, ?4, 1)
         "#,
     )
     .bind(title)
@@ -1053,6 +1203,20 @@ async fn add_subtask(
             return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to add subtask").into_response();
         }
     };
+
+    if let Err(err) =
+        sqlx::query("UPDATE tasks SET collapsed = 0, updated_at = datetime('now') WHERE id = ?1")
+            .bind(parent.id)
+            .execute(&pool)
+            .await
+    {
+        tracing::error!(?err, parent_id, "failed to expand parent task");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to expand parent task",
+        )
+            .into_response();
+    }
 
     match fetch_task(&pool, id).await {
         Ok(Some(task)) => Html(render_subtask(&task)).into_response(),
@@ -1372,27 +1536,28 @@ async fn move_task_to_parent(pool: &SqlitePool, id: i64, parent_id: i64, index: 
             .into_response();
     }
 
-    let child_count =
-        match sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tasks WHERE parent_id = ?1")
-            .bind(id)
-            .fetch_one(pool)
-            .await
-        {
-            Ok(row) => row.0,
-            Err(err) => {
-                tracing::error!(?err, id, "failed to count child tasks");
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
-            }
-        };
-    if child_count > 0 {
-        return (
-            StatusCode::BAD_REQUEST,
-            "Move or delete existing subtasks before making this task a subtask",
-        )
-            .into_response();
-    }
+    let child_ids = match sqlx::query_as::<_, (i64,)>(
+        "SELECT id FROM tasks WHERE parent_id = ?1 ORDER BY position ASC, id ASC",
+    )
+    .bind(id)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows.into_iter().map(|row| row.0).collect::<Vec<_>>(),
+        Err(err) => {
+            tracing::error!(?err, id, "failed to load child tasks");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
+        }
+    };
 
     let position = (index as i64) + 1;
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(err) => {
+            tracing::error!(?err, id, parent_id, "failed to begin move transaction");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
+        }
+    };
     if let Err(err) = sqlx::query(
         r#"
         UPDATE tasks
@@ -1405,21 +1570,66 @@ async fn move_task_to_parent(pool: &SqlitePool, id: i64, parent_id: i64, index: 
     .bind(parent.task_type.as_str())
     .bind(position)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     {
         tracing::error!(?err, id, parent_id, "failed to move task under parent");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
     }
-
-    match fetch_task(pool, id).await {
-        Ok(Some(task)) => Html(render_subtask(&task)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "Task not found").into_response(),
-        Err(err) => {
-            tracing::error!(?err, id, "failed to reload moved subtask");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Unable to reload task").into_response()
+    for (offset, child_id) in child_ids.iter().enumerate() {
+        if let Err(err) = sqlx::query(
+            r#"
+            UPDATE tasks
+            SET parent_id = ?1, bucket = ?2, task_type = ?3, position = ?4, collapsed = 0, updated_at = datetime('now')
+            WHERE id = ?5
+            "#,
+        )
+        .bind(parent.id)
+        .bind(parent.bucket.as_str())
+        .bind(parent.task_type.as_str())
+        .bind(position + offset as i64 + 1)
+        .bind(child_id)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!(?err, id, child_id, parent_id, "failed to flatten child task under parent");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
         }
     }
+    if let Err(err) =
+        sqlx::query("UPDATE tasks SET collapsed = 0, updated_at = datetime('now') WHERE id = ?1")
+            .bind(parent.id)
+            .execute(&mut *tx)
+            .await
+    {
+        tracing::error!(?err, parent_id, "failed to expand parent task");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
+    }
+    if let Err(err) = tx.commit().await {
+        tracing::error!(?err, id, parent_id, "failed to commit move transaction");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to move task").into_response();
+    }
+
+    let mut moved_ids = Vec::with_capacity(child_ids.len() + 1);
+    moved_ids.push(id);
+    moved_ids.extend(child_ids);
+    match render_moved_subtasks(pool, &moved_ids).await {
+        Ok(html) => Html(html).into_response(),
+        Err(err) => {
+            tracing::error!(?err, id, parent_id, "failed to reload moved subtasks");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Unable to reload tasks").into_response()
+        }
+    }
+}
+
+async fn render_moved_subtasks(pool: &SqlitePool, ids: &[i64]) -> anyhow::Result<String> {
+    let mut html = String::new();
+    for id in ids {
+        if let Some(task) = fetch_task(pool, *id).await? {
+            html.push_str(&render_subtask(&task));
+        }
+    }
+    Ok(html)
 }
 
 async fn move_task_to_bucket(pool: &SqlitePool, id: i64, bucket: Bucket, index: usize) -> Response {
@@ -1432,17 +1642,23 @@ async fn move_task_to_bucket(pool: &SqlitePool, id: i64, bucket: Bucket, index: 
     } else {
         TaskType::from_bucket(bucket)
     };
+    let collapsed = if task.parent_id.is_some() {
+        true
+    } else {
+        task.collapsed
+    };
 
     if let Err(err) = sqlx::query(
         r#"
         UPDATE tasks
-        SET parent_id = NULL, bucket = ?1, task_type = ?2, position = ?3, updated_at = datetime('now')
-        WHERE id = ?4
+        SET parent_id = NULL, bucket = ?1, task_type = ?2, position = ?3, collapsed = ?4, updated_at = datetime('now')
+        WHERE id = ?5
         "#,
     )
     .bind(bucket.as_str())
     .bind(task_type.as_str())
     .bind((index as i64) + 1)
+    .bind(if collapsed { 1_i64 } else { 0_i64 })
     .bind(id)
     .execute(pool)
     .await
@@ -1542,8 +1758,8 @@ fn render_completed_task(task: &Task) -> String {
     </div>
     <span class="completed-time"><span class="completed-date">{date_part}</span><span class="completed-time-only">{time_part}</span></span>
     <span class="button-group">
-        <button class="undo-btn" type="button" hx-post="/tasks/{id}/toggle" hx-target="closest li.completed-task" hx-swap="outerHTML" hx-on::afterRequest="window.location.reload()" title="Undo">&#8634;</button>
-        <button class="delete-btn" type="button" hx-post="/tasks/{id}/delete" hx-target="closest li.completed-task" hx-swap="outerHTML" title="Delete">&times;</button>
+        <button class="undo-btn" type="button" tabindex="-1" hx-post="/tasks/{id}/toggle" hx-target="closest li.completed-task" hx-swap="outerHTML" hx-on::afterRequest="window.location.reload()" title="Undo">&#8634;</button>
+        <button class="delete-btn" type="button" tabindex="-1" hx-post="/tasks/{id}/delete" hx-target="closest li.completed-task" hx-swap="outerHTML" title="Delete">&times;</button>
     </span>
 </li>"#,
         id = task.id,

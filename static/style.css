@@ -8,11 +8,13 @@
   --surface-2: rgba(0, 0, 0, 0.16);
   --surface-3: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.22);
   --text: #fff;
   --muted: rgba(255, 255, 255, 0.72);
   --danger: #a74441;
   --success: #2e7d32;
   --action: #1976d2;
+  --shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 * {
@@ -27,6 +29,7 @@ body {
 body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
   color: var(--text);
   background: #111;
 }
@@ -107,6 +110,8 @@ button {
   min-width: 980px;
   min-height: 0;
   height: 100%;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .column {
@@ -114,53 +119,45 @@ button {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  padding: 8px;
+  padding: 10px;
 }
 
 .column.ui {
-  background: var(--ui);
+  background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)), var(--ui);
 }
 
 .column.uni {
-  background: var(--uni);
+  background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)), var(--uni);
 }
 
 .column.nui {
-  background: var(--nui);
+  background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)), var(--nui);
 }
 
 .column.nun {
-  background: var(--nun);
+  background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.08)), var(--nun);
 }
 
 .column.today {
   grid-row: 1 / span 2;
-  background: var(--today);
+  background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.12)), var(--today);
 }
 
 .column-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
+  padding: 10px 12px;
   margin-bottom: 8px;
-  font-weight: 650;
-  background: var(--surface-2);
-  border-radius: 6px;
-}
-
-.badge {
-  padding: 2px 6px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: #0004;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.15;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .tasklist {
   flex: 1;
-  min-height: 64px;
+  min-height: 96px;
   padding: 0;
   margin: 0;
   overflow: auto;
@@ -178,20 +175,21 @@ button {
 
 .task,
 .subtask {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: rgba(25, 25, 25, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
 }
 
 .task {
-  margin: 7px 0;
-  padding: 10px;
+  margin: 8px 0;
+  padding: 9px;
+  box-shadow: var(--shadow);
 }
 
 .task-row,
 .subtask {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 
@@ -202,6 +200,18 @@ button {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   border-radius: 6px;
+  line-height: 1.35;
+}
+
+.text {
+  padding: 3px 2px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.subtask-text {
+  padding: 2px 0;
+  font-size: 0.94rem;
 }
 
 .text:focus,
@@ -212,10 +222,10 @@ button {
 
 .color-chip {
   flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  margin-top: 7px;
-  border-radius: 2px;
+  width: 5px;
+  height: 26px;
+  border-radius: 999px;
+  opacity: 0.95;
 }
 
 .color-UI {
@@ -236,10 +246,11 @@ button {
 
 .collapse-btn {
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   color: var(--text);
-  background: #0003;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .collapse-btn:hover {
@@ -247,25 +258,48 @@ button {
 }
 
 .subtask-region {
-  padding: 8px 0 0 44px;
+  margin: 8px 0 0 40px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .is-collapsed .subtask-region {
   display: none;
 }
 
+.is-collapsed .subtask,
+.is-collapsed .add-subtask-form {
+  display: none;
+}
+
 .subtask-list {
-  min-height: 8px;
+  min-height: 0;
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
+.top-task.nesting-candidate {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.24),
+    var(--shadow);
+}
+
+.top-task.nesting-candidate > .task-row {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .subtask {
   align-items: center;
-  padding: 7px 8px;
-  margin: 6px 0;
-  background: var(--surface-3);
+  padding: 6px 7px;
+  margin: 5px 0;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: none;
 }
 
 .subtask-completed .subtask-text {
@@ -275,9 +309,18 @@ button {
 
 .drag-handle {
   flex: 0 0 auto;
-  color: var(--muted);
+  width: 18px;
+  height: 24px;
   cursor: grab;
-  letter-spacing: -2px;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.64) 1.3px, transparent 1.4px);
+  background-position: 2px 4px;
+  background-size: 6px 6px;
+  opacity: 0.9;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .controls,
@@ -286,7 +329,7 @@ button {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 5px;
 }
 
 .controls button,
@@ -294,11 +337,18 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 31px;
+  height: 31px;
   color: var(--text);
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  border-radius: 8px;
+}
+
+.subtask .controls button {
+  width: 28px;
+  height: 28px;
+  font-size: 0.95rem;
 }
 
 .done-btn {
@@ -328,29 +378,39 @@ button {
 .add-form,
 .add-subtask-form {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .add-form {
-  margin-top: 8px;
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
 }
 
 .add-subtask-form {
-  margin-top: 6px;
+  margin-top: 7px;
 }
 
 .add-form input[type="text"],
 .add-subtask-form input[type="text"] {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  height: 34px;
+  padding: 6px 9px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 0.94rem;
 }
 
 .add-form button,
 .add-subtask-form button {
-  padding: 8px 12px;
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.92rem;
+  font-weight: 650;
 }
 
 .completed-panel {
