@@ -577,3 +577,205 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- User administration ------------------------------------------------ */
+
+.admin-page {
+  background:
+    radial-gradient(circle at top left, #344171 0, transparent 40rem),
+    #111;
+}
+
+.button-link {
+  display: inline-block;
+  padding: 8px 12px;
+  color: var(--text);
+  text-decoration: none;
+  background: #333;
+  border-radius: 8px;
+}
+
+.button-link:hover {
+  background: #444;
+}
+
+.admin-main {
+  display: grid;
+  gap: 20px;
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.admin-card {
+  padding: 20px 22px;
+  background: rgba(26, 26, 26, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.admin-card h2 {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+}
+
+.admin-flash {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.admin-flash.ok {
+  color: #d6ffd9;
+  background: rgba(46, 125, 50, 0.3);
+  border: 1px solid rgba(214, 255, 217, 0.25);
+}
+
+.admin-flash.err {
+  color: #ffd6d6;
+  background: rgba(167, 68, 65, 0.3);
+  border: 1px solid rgba(255, 214, 214, 0.25);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th {
+  padding: 0 10px 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table td {
+  padding: 12px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--surface-3);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.user-cell {
+  min-width: 10rem;
+}
+
+.admin-badge {
+  padding: 1px 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  background: var(--surface-3);
+  border-radius: 999px;
+}
+
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.inline-form input[type="password"] {
+  width: 11rem;
+  padding: 7px 10px;
+  color: var(--text);
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.inline-form button {
+  padding: 7px 12px;
+  color: var(--text);
+  background: #333;
+  white-space: nowrap;
+}
+
+.inline-form button:hover {
+  background: #444;
+}
+
+.link-btn {
+  padding: 7px 12px;
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.danger-btn {
+  padding: 7px 12px;
+  color: #fff;
+  background: var(--danger);
+}
+
+.purge-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.admin-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+}
+
+.admin-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-form input[type="text"],
+.admin-form input[type="password"] {
+  width: 14rem;
+  padding: 10px 12px;
+  color: var(--text);
+  background: #111;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 10px;
+}
+
+.admin-form button[type="submit"] {
+  padding: 10px 16px;
+  color: var(--text);
+  background: var(--action);
+}
+
+@media (max-width: 760px) {
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table tr {
+    display: grid;
+    gap: 8px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .admin-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .inline-form input[type="password"] {
+    width: 100%;
+  }
+}

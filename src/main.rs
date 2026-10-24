@@ -5,9 +5,7 @@ use axum::{
     routing::{get, patch, post},
     Router,
 };
-use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteRow},
     Row, SqlitePool,
@@ -16,27 +14,21 @@ use std::{
     collections::{BTreeMap, HashMap},
     env,
     net::SocketAddr,
-    path::{Path as FsPath, PathBuf},
     sync::{Arc, Mutex},
 };
 use tower_http::services::ServeDir;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-const SESSION_COOKIE: &str = "eisenpower_session";
+mod admin;
+mod auth;
 
-type HmacSha256 = Hmac<Sha256>;
+use auth::{AuthConfig, LoginError, Session};
 
 #[derive(Clone)]
 struct AppState {
     auth: Arc<AuthConfig>,
     pools: Arc<Mutex<HashMap<String, SqlitePool>>>,
-}
-
-struct AuthConfig {
-    users: HashMap<String, String>,
-    data_dir: PathBuf,
-    session_secret: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -112,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber).ok();
 
     let state = AppState {
-        auth: Arc::new(AuthConfig::from_env()?),
+        auth: Arc::new(AuthConfig::from_env().await?),
         pools: Arc::new(Mutex::new(HashMap::new())),
     };
 
@@ -134,6 +126,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/reorder", post(reorder_tasks))
         .route("/move", post(move_task))
         .route("/completed", get(completed_tasks))
+        .route("/admin", get(admin::admin_page))
+        .route("/admin/users", post(admin::create_user))
+        .route("/admin/users/{username}/admin", post(admin::set_admin_flag))
+        .route("/admin/users/{username}/delete", post(admin::delete_user))
+        .route(
+            "/admin/users/{username}/password",
+            post(admin::set_password),
+        )
         .nest_service("/static", ServeDir::new("static"))
         .with_state(state);
 
@@ -145,97 +145,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-impl AuthConfig {
-    fn from_env() -> anyhow::Result<Self> {
-        let users = load_users_from_env()?;
-        let data_dir = env::var("EISENPOWER_DATA_DIR")
-            .or_else(|_| env::var("EISENHOWER_DATA_DIR"))
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("data"));
-
-        let session_secret = env::var("EISENPOWER_SESSION_SECRET")
-            .or_else(|_| env::var("EISENHOWER_SESSION_SECRET"))
-            .unwrap_or_else(|_| derived_dev_secret(&users, &data_dir))
-            .into_bytes();
-
-        Ok(Self {
-            users,
-            data_dir,
-            session_secret,
-        })
-    }
-
-    fn user_db_path(&self, username: &str) -> PathBuf {
-        self.data_dir.join(format!("{username}.db"))
-    }
-}
-
-fn load_users_from_env() -> anyhow::Result<HashMap<String, String>> {
-    if let Ok(raw_users) = env::var("EISENPOWER_USERS").or_else(|_| env::var("EISENHOWER_USERS")) {
-        let mut users = HashMap::new();
-        for raw_pair in raw_users.split(',') {
-            let pair = raw_pair.trim();
-            if pair.is_empty() {
-                continue;
-            }
-            let Some((username, password)) = pair.split_once(':') else {
-                anyhow::bail!(
-                    "invalid EISENPOWER_USERS entry '{pair}', expected username:password"
-                );
-            };
-            let username = username.trim();
-            if !is_valid_username(username) {
-                anyhow::bail!(
-                    "invalid username '{username}', use letters, numbers, '.', '-', or '_'"
-                );
-            }
-            users.insert(username.to_string(), password.to_string());
-        }
-        if users.is_empty() {
-            anyhow::bail!("EISENPOWER_USERS did not contain any users");
-        }
-        return Ok(users);
-    }
-
-    let username = env::var("EISENPOWER_USERNAME")
-        .or_else(|_| env::var("EISENHOWER_USERNAME"))
-        .unwrap_or_else(|_| "admin".to_string());
-    let password = env::var("EISENPOWER_PASSWORD")
-        .or_else(|_| env::var("EISENHOWER_PASSWORD"))
-        .unwrap_or_else(|_| "password".to_string());
-
-    if !is_valid_username(&username) {
-        anyhow::bail!("invalid username '{username}', use letters, numbers, '.', '-', or '_'");
-    }
-
-    Ok(HashMap::from([(username, password)]))
-}
-
-fn derived_dev_secret(users: &HashMap<String, String>, data_dir: &FsPath) -> String {
-    let mut pairs = users
-        .iter()
-        .map(|(username, password)| format!("{username}:{password}"))
-        .collect::<Vec<_>>();
-    pairs.sort();
-    format!(
-        "eisenpower-dev-secret:{}:{}",
-        data_dir.display(),
-        pairs.join("|")
-    )
-}
-
-fn is_valid_username(username: &str) -> bool {
-    !username.is_empty()
-        && username
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
-}
-
 async fn pool_for_user(state: &AppState, username: &str) -> anyhow::Result<SqlitePool> {
     if let Some(pool) = state
         .pools
         .lock()
-        .expect("pool registry mutex poisoned")
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
         .get(username)
         .cloned()
     {
@@ -257,7 +171,7 @@ async fn pool_for_user(state: &AppState, username: &str) -> anyhow::Result<Sqlit
     state
         .pools
         .lock()
-        .expect("pool registry mutex poisoned")
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
         .insert(username.to_string(), pool.clone());
 
     Ok(pool)
@@ -333,18 +247,28 @@ async fn login_page() -> Html<String> {
 
 async fn login(State(state): State<AppState>, Form(form): Form<LoginForm>) -> Response {
     let username = form.username.trim();
-    let valid = state
-        .auth
-        .users
-        .get(username)
-        .is_some_and(|password| password == &form.password);
-
-    if !valid {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Html(render_login(Some("Invalid username or password"))),
-        )
-            .into_response();
+    match state.auth.authenticate(username, &form.password).await {
+        Ok(_) => {}
+        Err(LoginError::InvalidCredentials) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Html(render_login(Some("Invalid username or password"))),
+            )
+                .into_response()
+        }
+        Err(LoginError::RateLimited) => {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Html(render_login(Some(
+                    "Too many failed attempts. Try again in a few minutes.",
+                ))),
+            )
+                .into_response()
+        }
+        Err(LoginError::Internal(err)) => {
+            tracing::error!(?err, username, "failed to check credentials");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to sign in").into_response();
+        }
     }
 
     if let Err(err) = pool_for_user(&state, username).await {
@@ -356,19 +280,26 @@ async fn login(State(state): State<AppState>, Form(form): Form<LoginForm>) -> Re
             .into_response();
     }
 
+    let cookie = match state.auth.make_session_cookie(username).await {
+        Ok(cookie) => cookie,
+        Err(err) => {
+            tracing::error!(?err, username, "failed to issue a session cookie");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Unable to sign in").into_response();
+        }
+    };
+
     let mut response = Redirect::to("/").into_response();
-    if let Ok(value) = HeaderValue::from_str(&make_session_cookie(username, &state.auth)) {
+    if let Ok(value) = HeaderValue::from_str(&cookie) {
         response.headers_mut().append(header::SET_COOKIE, value);
     }
     response
 }
 
-async fn logout() -> Response {
+async fn logout(State(state): State<AppState>) -> Response {
     let mut response = Redirect::to("/login").into_response();
-    response.headers_mut().append(
-        header::SET_COOKIE,
-        HeaderValue::from_static("eisenpower_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"),
-    );
+    if let Ok(value) = HeaderValue::from_str(&state.auth.clear_session_cookie()) {
+        response.headers_mut().append(header::SET_COOKIE, value);
+    }
     response
 }
 
@@ -406,55 +337,38 @@ fn render_login(error: Option<&str>) -> String {
     )
 }
 
-fn make_session_cookie(username: &str, auth: &AuthConfig) -> String {
-    let signature = sign_username(username, auth);
-    format!("{SESSION_COOKIE}={username}.{signature}; Path=/; HttpOnly; SameSite=Lax")
-}
-
-fn sign_username(username: &str, auth: &AuthConfig) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(&auth.session_secret).expect("HMAC accepts any key length");
-    mac.update(username.as_bytes());
-    hex::encode(mac.finalize().into_bytes())
-}
-
-fn authenticated_user(headers: &HeaderMap, auth: &AuthConfig) -> Option<String> {
+/// Resolves the signed session cookie on a request, if it is still valid.
+async fn current_session(state: &AppState, headers: &HeaderMap) -> Option<Session> {
     let cookie_header = headers.get(header::COOKIE)?.to_str().ok()?;
-    let value = cookie_header
-        .split(';')
-        .map(str::trim)
-        .find_map(|cookie| cookie.strip_prefix(&format!("{SESSION_COOKIE}=")))?;
-    let (username, signature) = value.rsplit_once('.')?;
-    if !auth.users.contains_key(username) {
-        return None;
-    }
-
-    let signature = hex::decode(signature).ok()?;
-    let mut mac = HmacSha256::new_from_slice(&auth.session_secret).ok()?;
-    mac.update(username.as_bytes());
-    mac.verify_slice(&signature).ok()?;
-    Some(username.to_string())
+    state.auth.session_from_cookie(cookie_header).await
 }
 
 async fn require_pool(state: &AppState, headers: &HeaderMap) -> Result<SqlitePool, Response> {
-    let Some(username) = authenticated_user(headers, &state.auth) else {
+    let Some(session) = current_session(state, headers).await else {
         return Err(StatusCode::UNAUTHORIZED.into_response());
     };
 
-    pool_for_user(state, &username).await.map_err(|err| {
-        tracing::error!(?err, username, "failed to open user database");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Unable to open the user database",
-        )
-            .into_response()
-    })
+    pool_for_user(state, &session.username)
+        .await
+        .map_err(|err| {
+            tracing::error!(
+                ?err,
+                username = session.username,
+                "failed to open user database"
+            );
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to open the user database",
+            )
+                .into_response()
+        })
 }
 
 async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    let Some(username) = authenticated_user(&headers, &state.auth) else {
+    let Some(session) = current_session(&state, &headers).await else {
         return Redirect::to("/login").into_response();
     };
+    let username = session.username.clone();
 
     let pool = match pool_for_user(&state, &username).await {
         Ok(pool) => pool,
@@ -469,7 +383,7 @@ async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
     };
 
     match fetch_all_grouped(&pool).await {
-        Ok(groups) => Html(render_index(&username, groups)).into_response(),
+        Ok(groups) => Html(render_index(&username, session.is_admin, groups)).into_response(),
         Err(err) => {
             tracing::error!(?err, username, "failed to load tasks");
             (StatusCode::INTERNAL_SERVER_ERROR, "Unable to load tasks").into_response()
@@ -477,7 +391,11 @@ async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
     }
 }
 
-fn render_index(username: &str, groups: BTreeMap<&'static str, Vec<Task>>) -> String {
+fn render_index(
+    username: &str,
+    is_admin: bool,
+    groups: BTreeMap<&'static str, Vec<Task>>,
+) -> String {
     let ui = groups.get("UrgentImportant").cloned().unwrap_or_default();
     let uni = groups
         .get("UrgentNotImportant")
@@ -501,8 +419,8 @@ fn render_index(username: &str, groups: BTreeMap<&'static str, Vec<Task>>) -> St
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>Eisenpower</title>
     <link rel="stylesheet" href="/static/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="/static/vendor/htmx-1.9.10.min.js"></script>
+    <script src="/static/vendor/sortable-1.15.2.min.js"></script>
 </head>
 <body>
 <div class="matrix-scroll">
@@ -514,6 +432,7 @@ fn render_index(username: &str, groups: BTreeMap<&'static str, Vec<Task>>) -> St
         <div class="header-actions">
             <button id="refresh-btn" type="button" tabindex="-1">Refresh</button>
             <button id="show-completed-btn" type="button" tabindex="-1">Completed Tasks</button>
+            {}
             <form method="post" action="/logout">
                 <button type="submit" tabindex="-1">Sign out</button>
             </form>
@@ -841,6 +760,11 @@ document.addEventListener('DOMContentLoaded', function() {{
 </body>
 </html>"#,
         html_escape(username),
+        if is_admin {
+            "<a class=\"button-link\" href=\"/admin\">Users</a>"
+        } else {
+            ""
+        },
         render_column("UrgentImportant", "list-UI", &ui, 3, 4),
         render_column("UrgentNotImportant", "list-UNI", &uni, 5, 6),
         render_column("Today", "list-TODAY", &today, 1, 2),
@@ -964,7 +888,7 @@ fn color_chip(task: &Task) -> &'static str {
     }
 }
 
-fn html_escape(s: &str) -> String {
+pub(crate) fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")

@@ -1,14 +1,15 @@
-version: '3.8'
 services:
   eisenhower:
     build: .
     ports:
       - "${PORT:-8080}:8080"
     environment:
-      - EISENPOWER_USERS=${EISENPOWER_USERS:-admin:password}
       - EISENPOWER_DATA_DIR=/app/data
-      - EISENPOWER_SESSION_SECRET=${EISENPOWER_SESSION_SECRET:-change-me-for-shared-deployments}
-      - PORT=${PORT:-8080}
+      - PORT=8080
+      # Seeds the first administrator when the accounts database is empty.
+      # Once that account exists these are ignored -- manage users at /admin.
+      - EISENPOWER_ADMIN_USERNAME=${EISENPOWER_ADMIN_USERNAME:-admin}
+      - EISENPOWER_ADMIN_PASSWORD=${EISENPOWER_ADMIN_PASSWORD:-changeme-please}
     volumes:
       - eisenhower_data:/app/data
     restart: unless-stopped

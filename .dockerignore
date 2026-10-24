@@ -1,0 +1,10 @@
+.git
+.gitignore
+target
+data
+images
+*.db
+README.md
+LICENSE
+docker-compose*.yaml
+docker-compose*.yml

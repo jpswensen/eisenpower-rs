@@ -16,11 +16,9 @@ Here are some of the features
 - Completing a parent task completes all of its subtasks.
 - X button to delete a task entirely.
 - In the Completed Tasks panel, click the restore button to move the item back to the list of items still needing to be done.
-- Sign in with one of the configured users. Each user's tasks live in a separate SQLite file under the data directory.
+- Sign in with your own account. Each user's tasks live in a separate SQLite file under the data directory.
+- Administrators can add, remove, promote and reset users at `/admin` while the server is running.
 - The database schema is initialized by the application at startup; migrations are intentionally not used while the app is still pre-release.
-
-
-*Note*: This was 100% done via vibe coding, using my Swift implementation from 8 years ago and a screenshot of that interface as the input. I consider myself a pretty good programmer, but this was an experiment about whether I could make a fully functioning app without actually doing any coding. During this whole process, I resisted the urge to jump in and make code corrections along the way. Instead I was using GPT4.1 and only giving it prompts about what features I wanted to add, how I was expecting it to behave, and how it actually behaved. This was in VSCode with Copilot, so it was often interpreting the compiler errors and acting accordingly. I have used AI a lot in my day-to-day coding, but never done the full 'vibe coding' thing. I usually just have it implement a function here or there where I am giving it a function signature or a data structure or a directive, then edit code, then have it optimize or improve, etc. This was wholly code written by it without any "coding intervention" by me.
 
 ## Screenshots
 ![The main window](images/main_window.png)
@@ -30,18 +28,20 @@ Here are some of the features
 
 ## How to Run
 
-To run from the command line with the default `admin:password` login:
+To run from the command line:
 
 ```
 cargo run
 ```
 
-To run with your own users and data directory:
+On first start, with no accounts yet, an `admin` account is created with the
+password `changeme-please`. Sign in at http://127.0.0.1:8080 and change it.
+Pick your own instead with:
 
 ```
-EISENPOWER_USERS='admin:password,alice:correct-horse-battery-staple' \
+EISENPOWER_ADMIN_USERNAME='jpswensen' \
+EISENPOWER_ADMIN_PASSWORD='replace-this-with-a-real-password' \
 EISENPOWER_DATA_DIR='./data' \
-EISENPOWER_SESSION_SECRET='replace-this-with-a-long-random-secret' \
 cargo run
 ```
 
@@ -51,38 +51,62 @@ For an optimized local build:
 cargo run --release
 ```
 
-Then open http://127.0.0.1:8080 and sign in with one of the configured users.
-
-To run by creating a Docker image and container:
+To run in Docker:
 
 ```
 docker compose up --build
 ```
+
+## Managing users
+
+Accounts live in `<data dir>/_auth/users.db`, so they can be changed while the
+server is running. Sign in as an administrator and open **Users** in the header
+(or go to `/admin`) to:
+
+- add a user, optionally as an administrator
+- reset anyone's password
+- grant or revoke administrator access
+- remove a user, keeping or deleting their tasks
+
+Passwords are stored as Argon2id hashes. Resetting a password or removing a
+user invalidates that person's existing sign-in cookies immediately.
+
+Two rules are enforced so nobody can lock everyone out: you cannot remove or
+demote your own account, and the last remaining administrator cannot be removed
+or demoted.
 
 ## Configuration
 
-Users are configured with `EISENPOWER_USERS` as a comma-separated list of `username:password` pairs:
+Everything is optional. The defaults run the app on port 8080 with a `data`
+directory beside the binary.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8080` | Port to listen on. |
+| `EISENPOWER_DATA_DIR` | `data` | Where per-user task databases and the accounts database are stored. |
+| `EISENPOWER_ADMIN_USERNAME` | `admin` | Administrator to create when no administrator exists yet. |
+| `EISENPOWER_ADMIN_PASSWORD` | `changeme-please` | That administrator's initial password. |
+| `EISENPOWER_USERS` | — | Optional `username:password` list used to seed accounts on first run. |
+| `EISENPOWER_ADMINS` | — | Comma-separated usernames from `EISENPOWER_USERS` to make administrators. |
+| `EISENPOWER_SESSION_SECRET` | generated | HMAC key for session cookies. Leave unset and a random one is generated and saved to `<data dir>/_auth/session.key`. |
+| `EISENPOWER_SESSION_MAX_AGE` | `2592000` | Sign-in lifetime in seconds (30 days). |
+| `EISENPOWER_COOKIE_SECURE` | `false` | Set to `true` when serving over HTTPS. |
+
+`EISENPOWER_USERS` and the two `ADMIN` variables only ever *create* accounts
+that do not exist yet. They never overwrite an account, so a password changed
+in the admin UI survives a restart even if the old value is still in your
+compose file.
+
+## Deploying a prebuilt image
+
+`Dockerfile` cross-compiles, so an image for a low-memory ARM64 box can be built
+on a workstation instead of on the device itself:
 
 ```
-EISENPOWER_USERS='admin:password,alice:correct-horse-battery-staple' cargo run
+docker buildx build --platform linux/arm64 --tag eisenpower-rs:0.1.0 \
+  --output type=docker,dest=eisenpower-rs-arm64.tar .
 ```
 
-By default the app creates one database per user in `data/<username>.db`. Change this with `EISENPOWER_DATA_DIR`. For shared or long-running deployments, set `EISENPOWER_SESSION_SECRET` so login cookies remain valid across restarts.
-
-For Docker Compose, edit the `environment` section in `docker-compose.yaml` (or `docker-compose.yml` if you use that filename):
-
-```yaml
-environment:
-  - EISENPOWER_USERS=admin:password,alice:correct-horse-battery-staple,bob:another-password
-  - EISENPOWER_DATA_DIR=/app/data
-  - EISENPOWER_SESSION_SECRET=replace-this-with-a-long-random-secret
-  - PORT=8080
-```
-
-After saving the file, rebuild and launch:
-
-```
-docker compose up --build
-```
+See [DEPLOY.md](DEPLOY.md) for the full walkthrough used for a Synology NAS.
 
 Enjoy!
